@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="中芸盤點">
+  <title>115年財產離線盤點</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <script src="vendor/jszip.min.js" defer></script>
+  <script src="vendor/html5-qrcode.min.js" defer></script>
+  <script src="data/assets_115.js" defer></script>
+  <script src="db.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">高雄市立中芸國民中學</div>
+      <h1>115年財產離線盤點</h1>
+    </div>
+    <div id="connectionBadge" class="status-pill">檢查中</div>
+  </header>
+
+  <main>
+    <section class="card setup-card">
+      <div class="section-heading">
+        <div>
+          <div class="eyebrow">開始前設定</div>
+          <h2>盤點人與目前地點</h2>
+        </div>
+        <span class="data-badge">固定 1,345 筆</span>
+      </div>
+      <div class="form-grid two-cols">
+        <label>盤點人
+          <input id="operatorInput" type="text" autocomplete="name" placeholder="請輸入姓名">
+        </label>
+        <label>手機代號
+          <input id="deviceInput" type="text" placeholder="例如：手機01">
+        </label>
+      </div>
+      <label>目前盤點地點
+        <select id="locationSelect"></select>
+      </label>
+      <div class="hint">地點選好後再開始掃描；系統會列出該地點尚未找到的財產。</div>
+    </section>
+
+    <section class="summary-grid" aria-label="盤點進度">
+      <article class="summary-card"><span>全部進度</span><strong id="overallProgress">0 / 1345</strong><small id="overallPercent">0%</small></article>
+      <article class="summary-card"><span>目前地點</span><strong id="locationProgress">0 / 0</strong><small id="locationNameSummary">尚未選擇</small></article>
+      <article class="summary-card warning"><span>異常紀錄</span><strong id="abnormalCount">0</strong><small>位置／標籤／報廢</small></article>
+      <article class="summary-card warning"><span>待釐清物品</span><strong id="unlabeledCount">0</strong><small>無標籤／疑似未入帳</small></article>
+    </section>
+
+    <nav class="tabbar" aria-label="主要功能">
+      <button type="button" class="tab active" data-tab="scanPanel">盤點</button>
+      <button type="button" class="tab" data-tab="missingPanel">未盤</button>
+      <button type="button" class="tab" data-tab="recordsPanel">紀錄</button>
+      <button type="button" class="tab" data-tab="unlabeledPanel">待釐清</button>
+      <button type="button" class="tab" data-tab="backupPanel">備份</button>
+    </nav>
+
+    <section id="scanPanel" class="panel active">
+      <div class="card">
+        <div class="section-heading">
+          <div><div class="eyebrow">掃描入口</div><h2>掃描或搜尋財產</h2></div>
+        </div>
+        <div class="action-grid">
+          <button id="startCameraButton" type="button" class="primary large">開啟相機連續掃描</button>
+          <button id="scanPhotoButton" type="button" class="secondary large">拍下條碼辨識</button>
+        </div>
+        <input id="barcodePhotoInput" type="file" accept="image/*" capture="environment" hidden>
+        <div id="readerWrap" class="reader-wrap" hidden>
+          <div id="reader"></div>
+          <button id="stopCameraButton" type="button" class="danger">停止相機</button>
+        </div>
+        <div id="fileReader" hidden></div>
+        <div class="manual-row">
+          <input id="searchInput" type="search" inputmode="search" placeholder="輸入條碼、財產編號或名稱">
+          <button id="searchButton" type="button" class="secondary">搜尋</button>
+        </div>
+        <div id="searchResults" class="search-results"></div>
+        <div id="scanMessage" class="message" hidden></div>
+      </div>
+
+      <form id="assetForm" class="card asset-card" hidden>
+        <div class="asset-title-row">
+          <div>
+            <div id="assetCategory" class="eyebrow"></div>
+            <h2 id="assetName"></h2>
+            <div id="assetId" class="mono"></div>
+          </div>
+          <span id="existingBadge" class="status-pill warning-pill" hidden>已盤過</span>
+        </div>
+        <dl class="asset-facts">
+          <div><dt>標籤條碼</dt><dd id="assetBarcode" class="mono"></dd></div>
+          <div><dt>帳面地點</dt><dd id="assetExpectedLocation"></dd></div>
+          <div><dt>保管人</dt><dd id="assetCustodian"></dd></div>
+          <div><dt>規格</dt><dd id="assetSpec"></dd></div>
+        </dl>
+        <label>實際找到地點
+          <select id="actualLocationSelect" required></select>
+        </label>
+        <label>盤點結果
+          <select id="resultSelect" required>
+            <option value="相符">相符</option>
+            <option value="位置不符">位置不符</option>
+            <option value="標籤異常">標籤異常</option>
+            <option value="待報廢">待報廢</option>
+            <option value="待確認">待確認</option>
+          </select>
+        </label>
+        <label>備註
+          <textarea id="noteInput" rows="3" placeholder="異常或更正時請填寫"></textarea>
+        </label>
+        <label class="photo-box">現場照片
+          <input id="photoInput" type="file" accept="image/*" capture="environment">
+          <span class="hint">位置不符、標籤異常、待報廢時必須拍照。</span>
+          <img id="photoPreview" alt="財產照片預覽" hidden>
+        </label>
+        <div class="sticky-actions">
+          <button id="cancelAssetButton" type="button" class="ghost">取消</button>
+          <button type="submit" class="primary">儲存盤點紀錄</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="missingPanel" class="panel">
+      <div class="card">
+        <div class="section-heading">
+          <div><div class="eyebrow">目前地點</div><h2>尚未找到清單</h2></div>
+          <button id="refreshMissingButton" type="button" class="ghost small">重新整理</button>
+        </div>
+        <div id="missingSummary" class="hint"></div>
+        <div id="missingList" class="item-list"></div>
+      </div>
+    </section>
+
+    <section id="recordsPanel" class="panel">
+      <div class="card">
+        <div class="section-heading">
+          <div><div class="eyebrow">本機資料</div><h2>已盤點紀錄</h2></div>
+          <input id="recordFilter" class="compact-input" type="search" placeholder="篩選">
+        </div>
+        <div id="recordList" class="item-list"></div>
+      </div>
+    </section>
+
+    <section id="unlabeledPanel" class="panel">
+      <form id="unlabeledForm" class="card asset-card">
+        <div class="section-heading">
+          <div><div class="eyebrow">現場先留證據</div><h2>新增無標籤／待釐清物品</h2></div>
+        </div>
+        <div class="hint">適用於標籤脫落、同型號無法分辨，或疑似未入帳。先拍照記下地點，回辦公室再配對正式編號。</div>
+        <div class="form-grid two-cols">
+          <label>暫定類別
+            <select id="unlabeledCategory"><option>不確定</option><option>財產</option><option>非消耗品</option></select>
+          </label>
+          <label>待查原因
+            <select id="unlabeledReason"><option>無法辨識</option><option>標籤脫落</option><option>疑似未入帳</option><option>同型號無法分辨</option></select>
+          </label>
+        </div>
+        <label>物品名稱
+          <input id="unlabeledName" type="text" required placeholder="例如：黑色辦公椅、HP印表機">
+        </label>
+        <label>品牌／型號／特徵
+          <input id="unlabeledSpec" type="text" placeholder="例如：HP M404dn、機身有刮痕">
+        </label>
+        <div class="form-grid two-cols">
+          <label>數量<input id="unlabeledQuantity" type="number" min="1" value="1" required></label>
+          <label>保管人（可空白）<input id="unlabeledCustodian" type="text"></label>
+        </div>
+        <label>備註
+          <textarea id="unlabeledNote" rows="3" placeholder="可記錄附近位置、使用人或其他辨識線索"></textarea>
+        </label>
+        <label class="photo-box">物品照片（必拍）
+          <input id="unlabeledPhotoInput" type="file" accept="image/*" capture="environment" required>
+          <span class="hint">新拍照片會自動壓到約500KB以內。</span>
+          <img id="unlabeledPhotoPreview" alt="待釐清物品照片預覽" hidden>
+        </label>
+        <button type="submit" class="primary full">儲存待釐清紀錄</button>
+      </form>
+      <div class="card">
+        <div class="section-heading"><div><div class="eyebrow">本機資料</div><h2>已記錄待釐清物品</h2></div></div>
+        <div id="unlabeledList" class="item-list"></div>
+      </div>
+    </section>
+
+    <section id="backupPanel" class="panel">
+      <div class="card">
+        <div class="section-heading"><div><div class="eyebrow">資料安全</div><h2>匯出與還原</h2></div></div>
+        <div class="backup-callout">
+          <strong>建議每完成一個地點就匯出一次；待釐清物品也會一起備份。</strong>
+          <span id="lastExportText">尚未匯出備份</span>
+        </div>
+        <button id="exportButton" type="button" class="primary full">匯出盤點ZIP資料包</button>
+        <label class="file-button">從ZIP還原／合併
+          <input id="importInput" type="file" accept=".zip,application/zip" hidden>
+        </label>
+        <hr>
+        <div class="danger-zone">
+          <strong>清除本機盤點紀錄</strong>
+          <p>請先匯出ZIP備份。此操作不會清除1,345筆主檔。</p>
+          <button id="clearButton" type="button" class="danger">清除全部盤點紀錄</button>
+        </div>
+      </div>
+      <div class="card install-card">
+        <h2>iPhone安裝提醒</h2>
+        <ol>
+          <li>第一次須以HTTPS網址用Safari開啟。</li>
+          <li>點「分享」→「加入主畫面」→開啟為網頁App。</li>
+          <li>看到上方顯示「離線可用」後，再進入無網路區域。</li>
+          <li>不要清除Safari網站資料；更新iOS前先匯出ZIP。</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+</body>
+</html>

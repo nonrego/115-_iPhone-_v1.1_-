@@ -1,0 +1,14 @@
+{
+  "name": "中芸國中115年財產離線盤點",
+  "short_name": "中芸盤點",
+  "description": "1,345筆財產與非消耗品的iPhone離線盤點工具",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7f8",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
